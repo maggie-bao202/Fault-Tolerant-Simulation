@@ -1,4 +1,4 @@
-# Fault_Tolerant_Sim
+# Fault-Tolerant-Simulation
 
 End-to-end fault-tolerant simulation pipeline for a logical `{H, S, T, CNOT}` circuit,
 run entirely in the `[[6,2,2]]` / Magic-H6 code with **real** `T` gates via the
