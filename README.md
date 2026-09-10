@@ -1,84 +1,89 @@
 # Fault-Tolerant-Simulation
 
-End-to-end fault-tolerant simulation pipeline for a logical `{H, S, T, CNOT}` circuit,
-run entirely in the `[[6,2,2]]` / Magic-H6 code with **real** `T` gates via the
-[clifft](https://github.com/unitaryfoundation/clifft) near-Clifford simulator.
+Pluggable end-to-end fault-tolerant simulation of a logical `{H, S, T, CNOT}`
+circuit, built on **[LightStim](../LightStim)**. The QEC **code** and the
+**protocol** are separate axes; magic-state supply is chosen by flag.
 
-## What it does
+```python
+from ftsim import LogicalCircuit, run_pipeline
 
-Given a logical circuit as a Python gate list, `ftsim`:
+lc = LogicalCircuit([("H", 0), ("T", 0), ("CNOT", 0, 1), ("S", 1), ("T", 1)])
 
-1. **Compiles** it to a single `[[6,2,2]]` circuit — one code patch per logical qubit
-   (logical slot 0 used; slot 1 is a spectator), `H/S/CNOT` transversal, and each `T`
-   realised by distilling a magic block in the H6 `[[6,2,2]]` factory
-   (Magic-H6 encoder + transversal physical `T` + stabilizer post-selection)
-   and gate-teleporting it — post-selecting the no-`S` branch.
-2. **Checks** the noiseless compiled circuit against the intended logical unitary
-   (compiled output distribution vs a dense state-vector reference, per input state).
-3. **Simulates** the round-trip `lc ; lc†` under circuit-level depolarising noise
-   (real `T` gates via clifft) and reports post-selection yield and logical error rate.
+run_pipeline(lc, p=1e-3)                              # processor, T via zero-level distillation
+run_pipeline(lc, p=1e-3, distillation=1)             # T via level-1 Magic-H6 distillation
+run_pipeline(lc, p=1e-3, code="rotated_surface")    # swap the code
+run_pipeline(lc, p=1e-3, protocol="memory")         # d-round memory experiment
+run_pipeline(None, p=1e-3, protocol="factory",      # benchmark the magic factory alone
+             zero_lvl_distill=True)
+```
 
-Scoring is by **post-selection**: `[[6,2,2]]` has distance 2, so any fired stabilizer /
-factory / teleportation-branch detector discards the shot.
+## Code ≠ protocol
 
-### Fidelity notes
+* **`code=`** — the encoded structure only (`lightstim.qec_code`): `"h6"`,
+  `"steane"` (= `ColorCode(distance=3)`, `[[7,1,3]]`), `"rotated_surface"`,
+  `"repetition"`, `"color"`, … A `CodeSpec` names LightStim's patch class, SE
+  block and `LogicalOpSet` + a gate→method map. Codes carry **no** magic-state
+  logic.
+  * **`factory_code=`** — run the magic-state factory in a *different* code from
+    the processor. The checked resource is **injected** into the processor's
+    code (grow the verified small-code state into the larger one — no inter-code
+    coupler), then gate-teleported. e.g.
+    `run_pipeline(lc, code="steane", factory_code="h6", distillation=1)`.
+    Proxy note: the factory acceptance and the target-code growth compose and
+    their yields multiply, but the resource is a fresh `|+>_L` stand-in at each
+    stage until the non-Clifford backend lands.
+* **`protocol=`** — what to *do* with the code:
+  * `"processor"` (default) — run the logical circuit: per-patch encode →
+    `{transversal gate layer ; SE round}` → readout. Clifford gates driven by
+    LightStim `LogicalOpSet` methods (routed by `lightstim.ir.LogicalExecutor`).
+  * `"memory"` — a d-round memory experiment, delegated to
+    `lightstim.protocols.MemoryExperiment`.
+  * `"factory"` — build *just* a magic-state factory block and report its yield +
+    output infidelity.
 
-- **Clifford gates (`H/S/CNOT`)** are exact and fault-tolerant: LER = 0 at `p = 0`,
-  compiled unitary matches exactly.
-- **`T` gates** are exact when *not* immediately conjugated by `H` on the same qubit
-  (a `T` that is first-on-its-qubit, or follows only `S`/`CNOT`). Bare `[[6,2,2]]`
-  has **no exact transversal `T`**, so a `T` sandwiched by `H` carries a residual
-  coherent infidelity (~7% TVD per such `T`). This is surfaced per circuit as
-  `FTReport.noiseless_error_floor`; `FTReport.logical_error_rate_net` subtracts it.
-  Exact arbitrary-`T` fault tolerance needs the concatenated Magic-H6 protocol
-  (`lightstim.protocols.magic_h6_benchmark` level 2) — out of scope here.
-- clifft cost grows with simultaneously-live magic; keep the `T`-count small.
+## Magic-state factory
+
+A magic-state factory has several possible protocols (not a mandatory sequence).
+Pick one with a flag; it is the `T` source for the processor, or the standalone
+subject of `protocol="factory"`:
+
+| flag | protocol | status |
+|---|---|---|
+| `zero_lvl_distill=` | `[[6,2,2]]` **0-level distillation** — encode + one SE round (post-selected) + teleport. `True` / `"TT"` / `"A"` / `"H"`. | ✅ (Clifford proxy; recipe `"TT"` = the reference; `"A"`/`"H"` are the non-Clifford path) |
+| `distillation=` | Magic-H6 **n→1 distillation**. `1` = one `[[6,2,2]]` block + the Bell-pair X-logical H-check. `>=2` = concatenated `[[36,4,4]]`. | `1` ✅, `>=2` → `NotImplementedError` (LightStim roadmap stage 4) |
+| `cultivation=` | **Magic-state cultivation** (grow/protect in a larger code; arXiv:2409.17595). | → `NotImplementedError` |
+
+At most one may be set. `T` is the **Magic-H6 Clifford proxy** (stim-only): the
+magic block is a stabilizer stand-in for `|T>_L`, so error propagation and
+post-selection yield are exact but the `T` rotation is not modelled
+(`noiseless_error_floor == 0`; `check_unitary` says so for non-Clifford circuits).
+Real-`T` fidelity and the `p_in → p_in²` gain are the follow-up (LightStim
+`feat/magic-h6-protocol` + a `clifft` backend).
 
 ## Layout
 
 ```
 ftsim/
-  logical_gates.py     LogicalCircuit -- the input gate-list type      (public)
-  pipeline.py          run_pipeline(lc, p, ...) -> FTReport            (public)
-  qec/                  the [[6,2,2]] code layer
-    h6.py               code data + circuit fragments (encoder, SE round, H-check)
-    layout.py            patch placement / global-index bookkeeping
-  resources/           encoded resource states
-    zero_level_distillation.py   H6 magic factory (encode + transversal T + stabilizer post-select)
-  processor/           LogicalCircuit -> one [[6,2,2]] clifft circuit (every step)
-    t_state_teleport.py  logical-T gadget: consume a distilled magic block
-    processor.py         compile(lc, ...) -> Compiled  (text + detector/observable metadata)
-    emit.py              circuit-text builder with rec[-k] tracking
-  sim/                 noise, execution, reference
-    noise.py             circuit-level depolarising noise (text level)
-    simulate.py          run through clifft + post-selected scoring
-    ideal.py             dense state-vector reference for the unitary check
-tests/                  ideal / clifft-smoke / compile-noiseless / factory / gadget / pipeline
+  logical_gates.py   LogicalCircuit -- the input gate-list type          (public)
+  pipeline.py        run_pipeline / check_unitary / FTReport             (public)
+  backends.py        CodeSpec (descriptor over LightStim classes) + Driver
+  processor.py       the processor protocol (LogicalCircuit -> stim.Circuit)
+                     + compile_memory (-> lightstim.protocols.MemoryExperiment)
+  factory.py         MagicProtocol base + H6ZeroLevelDistillation /
+                     H6Distillation(level=) / Cultivation + make_magic_source
+  score.py           sample -> post-select -> logical-error rate
+  sim/ideal.py       dense state-vector reference for check_unitary
+tests/
 notebooks/ft_pipeline_demo.ipynb
 ```
 
-**Self-contained**: no dependency on any file outside this repo. The `[[6,2,2]]`
-encoder / extraction round, the magic factory and the T-teleportation gadget are
-vendored into `ftsim/qec/h6.py`, `ftsim/resources/zero_level_distillation.py` and
-`ftsim/processor/t_state_teleport.py` (ported from CQCL Magic-H6 `Code614.py` /
-LightStim `lightstim.qec_code.six_two_two`).
+Add a code: one `ftsim.backends.register(CodeSpec(...))`. Add a factory protocol:
+subclass `ftsim.factory.MagicProtocol` and wire it into `make_magic_source`.
 
 ## Requirements
 
-- Python 3.12 (matches the shared `Infleqtion/.venv`)
-- `clifft`, `stim`, `numpy`, `pandas` (+ `matplotlib` for the demo notebook)
+Python 3.12; `lightstim` (editable, `../LightStim`), `stim`, `numpy`, `pandas`.
 
 ```
-pip install -e .            # from this directory
-```
-
-## Quick start
-
-```python
-from ftsim.logical_gates import LogicalCircuit
-from ftsim.pipeline import run_pipeline
-
-lc = LogicalCircuit([("H", 0), ("T", 0), ("CNOT", 0, 1), ("S", 1), ("T", 1)])
-report = run_pipeline(lc, p=1e-3, shots=200_000)
-print(report)
+uv pip install -e ../LightStim -e .      # or: uv sync
 ```

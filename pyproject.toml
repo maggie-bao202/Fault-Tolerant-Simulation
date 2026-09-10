@@ -4,18 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ftsim"
-version = "0.1.0"
-description = "End-to-end fault-tolerant [[6,2,2]] simulation pipeline with real T gates (clifft)"
+version = "0.2.0"
+description = "Pluggable fault-tolerant logical-circuit simulation on LightStim (H6 + more)"
 requires-python = ">=3.12"
 dependencies = [
-    "clifft>=0.9",
-    "stim>=1.14",
+    "lightstim",
+    "stim>=1.15",
     "numpy>=1.26",
     "pandas>=2.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "nbconvert>=7", "ipykernel>=6", "matplotlib>=3.8"]
+dev = ["pytest>=8", "nbconvert>=7", "ipykernel>=6", "matplotlib>=3.8", "nbformat>=5"]
+
+[tool.uv.sources]
+lightstim = { path = "../LightStim", editable = true }
 
 [tool.setuptools.packages.find]
 include = ["ftsim*"]
