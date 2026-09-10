@@ -1,5 +1,9 @@
 """Compile a :class:`~ftsim.logical_gates.LogicalCircuit` to one ``[[6,2,2]]`` circuit.
 
+Every step runs through here: per-patch prep, stabilizer-extraction rounds,
+transversal ``H/S/CNOT`` layers, one T-state teleport block per ``T`` (see
+:mod:`ftsim.processor.t_state_teleport`), and the final destructive readout.
+
 Output is clifft circuit text plus the metadata needed to post-select and score:
 
 * every ``DETECTOR`` is post-selected;
@@ -15,10 +19,10 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Sequence
 
 from .emit import Circ
+from .t_state_teleport import t_teleport_lines
 from ..logical_gates import LogicalCircuit
 from ..qec.layout import Layout, build as build_layout
 from ..qec.h6 import encoder_lines
-from ..qec.tfactory import t_teleport_lines
 
 _INPUT_FIXUP = {  # transversal gates to turn |++>_L (get_dist_circ) into the input state
     "+": [],

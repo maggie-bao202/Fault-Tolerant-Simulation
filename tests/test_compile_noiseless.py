@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from ftsim.logical_gates import LogicalCircuit
-from ftsim.compiler import compile as compile_lc
+from ftsim.processor import compile as compile_lc
 from ftsim.pipeline import check_unitary, run_pipeline
 from ftsim.sim import reference
 

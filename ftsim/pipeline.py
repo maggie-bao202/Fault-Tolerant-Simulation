@@ -9,7 +9,7 @@ import time
 import numpy as np
 import clifft
 
-from .compiler.lower import Compiled, compile as compile_lc
+from .processor import Compiled, compile as compile_lc
 from .logical_gates import LogicalCircuit
 from .sim.ideal import state_of
 from .sim.simulate import Reference, RunStats, reference, run

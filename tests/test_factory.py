@@ -1,9 +1,10 @@
-"""The H6 [[6,2,2]] magic factory in isolation."""
+"""Zero-level distillation: the H6 [[6,2,2]] magic factory in isolation."""
 
 import numpy as np
 import clifft
 
-from ftsim.qec import build, magic_factory_lines
+from ftsim.qec import build
+from ftsim.resources import magic_factory_lines
 
 _STAB = ((0, 1, 2, 3), (2, 3, 4, 5))
 _SLOT0 = (0, 2, 4)

@@ -43,10 +43,12 @@ ftsim/
   qec/                  the [[6,2,2]] code layer
     h6.py               code data + circuit fragments (encoder, SE round, H-check)
     layout.py            patch placement / global-index bookkeeping
-    tfactory.py          H6 magic factory + T-teleportation gadget
-  compiler/            LogicalCircuit -> one [[6,2,2]] clifft circuit
+  resources/           encoded resource states
+    zero_level_distillation.py   H6 magic factory (encode + transversal T + stabilizer post-select)
+  processor/           LogicalCircuit -> one [[6,2,2]] clifft circuit (every step)
+    t_state_teleport.py  logical-T gadget: consume a distilled magic block
+    processor.py         compile(lc, ...) -> Compiled  (text + detector/observable metadata)
     emit.py              circuit-text builder with rec[-k] tracking
-    lower.py             compile(lc, ...) -> Compiled  (text + detector/observable metadata)
   sim/                 noise, execution, reference
     noise.py             circuit-level depolarising noise (text level)
     simulate.py          run through clifft + post-selected scoring
@@ -56,9 +58,10 @@ notebooks/ft_pipeline_demo.ipynb
 ```
 
 **Self-contained**: no dependency on any file outside this repo. The `[[6,2,2]]`
-encoder / extraction round and the T-teleportation gadget are vendored into
-`ftsim/qec/h6.py` and `ftsim/qec/tfactory.py` (ported from CQCL Magic-H6
-`Code614.py` / LightStim `lightstim.qec_code.six_two_two`).
+encoder / extraction round, the magic factory and the T-teleportation gadget are
+vendored into `ftsim/qec/h6.py`, `ftsim/resources/zero_level_distillation.py` and
+`ftsim/processor/t_state_teleport.py` (ported from CQCL Magic-H6 `Code614.py` /
+LightStim `lightstim.qec_code.six_two_two`).
 
 ## Requirements
 

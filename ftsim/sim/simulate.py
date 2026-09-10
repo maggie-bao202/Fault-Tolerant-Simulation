@@ -8,7 +8,7 @@ from typing import Optional
 import numpy as np
 import clifft
 
-from ..compiler.lower import Compiled
+from ..processor import Compiled
 from .noise import add_noise
 
 

@@ -1,16 +1,12 @@
-"""The T-teleportation gadget / H6 magic factory (ftsim.tfactory)."""
+"""The T-state teleportation gadget (ftsim.processor) + zero-level distillation."""
 
 import numpy as np
 import pytest
 
 import clifft
-from ftsim.qec import (
-    MAGIC_FIXUP,
-    MAGIC_INPUT,
-    build,
-    magic_factory_lines,
-    t_teleport_lines,
-)
+from ftsim.qec import build
+from ftsim.resources import MAGIC_INPUT, magic_factory_lines
+from ftsim.processor import MAGIC_FIXUP, t_teleport_lines
 from ftsim.logical_gates import LogicalCircuit
 from ftsim.pipeline import check_unitary
 
