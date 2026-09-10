@@ -1,11 +1,5 @@
-"""Noise injection, clifft execution + post-selected scoring, ideal reference."""
+"""Dense state-vector reference for the intended logical unitary."""
 
 from .ideal import expectation, expected_expvals, state_of
-from .noise import add_noise
-from .simulate import Reference, RunStats, reference, run
 
-__all__ = [
-    "expectation", "expected_expvals", "state_of",
-    "add_noise",
-    "Reference", "RunStats", "reference", "run",
-]
+__all__ = ["state_of", "expectation", "expected_expvals"]
