@@ -55,6 +55,7 @@ class FTReport:
     code: str = "h6"
     protocol: str = "processor"
     magic: str = ""
+    frontend: str = "gate"
     noiseless_error_floor: float = 0.0
     noiseless_yield: float = float("nan")
     unitary_check_detail: Dict[str, float] = field(default_factory=dict)
@@ -66,8 +67,9 @@ class FTReport:
 
     def __str__(self) -> str:
         mg = f", magic={self.magic}" if self.magic else ""
+        fe = f", frontend={self.frontend}" if self.frontend != "gate" else ""
         return (
-            f"FTReport(code={self.code}, protocol={self.protocol}{mg}, "
+            f"FTReport(code={self.code}, protocol={self.protocol}{mg}{fe}, "
             f"n={self.n_logical}, T={self.t_count}, phys={self.physical_qubits}, "
             f"shots={self.shots}, accept={self.post_selection_rate:.4g}, "
             f"LER={self.logical_error_rate:.4g} (floor {self.noiseless_error_floor:.3g}), "
@@ -111,13 +113,21 @@ def check_unitary(
     atol: float = _UNITARY_ATOL,
     seed: int = 7,
     code_kwargs: Optional[dict] = None,
+    frontend: str = "gate",
 ) -> tuple[bool, Dict[str, float]]:
     """Noiseless check that the compiled circuit implements ``lc``.
 
     Under the Clifford proxy ``T`` acts as identity, so the reference is
     :func:`state_of` of ``lc`` with every ``T`` dropped -- exact for Clifford
     circuits; for non-Clifford circuits this validates the Clifford skeleton only.
+
+    ``frontend`` is accepted for signature symmetry with :func:`run_pipeline`;
+    the check always uses the gate-dispatch compile path (it needs
+    ``final="slot0_z"``, which the PPM lowering does not provide) and so
+    validates the same ``LogicalCircuit`` regardless of how ``run_pipeline``
+    compiles it.
     """
+    del frontend
     ref_lc = _t_free(lc)
     n = lc.n_qubits
     detail: Dict[str, float] = {}
@@ -166,8 +176,16 @@ def run_pipeline(
     se_rounds_per_layer: int = 1,
     rounds: int = 3,
     code_kwargs: Optional[dict] = None,
+    frontend: str = "gate",
 ) -> FTReport:
     t0 = time.perf_counter()
+    if frontend not in ("gate", "ppm"):
+        raise ValueError(f"frontend must be 'gate' or 'ppm'; got {frontend!r}")
+    if frontend == "ppm" and protocol != "processor":
+        raise ValueError(
+            "frontend='ppm' only applies to protocol='processor'; "
+            f"got protocol={protocol!r}"
+        )
     magic = make_magic_source(
         zero_lvl_distill=zero_lvl_distill, cultivation=cultivation,
         distillation=distillation,
@@ -207,12 +225,22 @@ def run_pipeline(
         n = lc.n_qubits
         istate = "0" * n if input_state is None else input_state
         bench = LogicalCircuit(list(lc.gates) + list(lc.inverse().gates))
-        comp = compile_logical_circuit(
-            bench, code, magic_source=magic,
-            factory_code=(factory_code if cross else None),
-            input_state=istate, se_rounds_per_layer=se_rounds_per_layer,
-            code_kwargs=code_kwargs,
-        )
+        if frontend == "ppm":
+            from .ppm import compile_ppm
+            # non-Clifford (pi/8) rotations raise NotImplementedError from
+            # magic_injection; an unsupported code raises PPMUnsupported;
+            # a missing ftsim[ppm] dep raises ImportError -- all propagate.
+            comp = compile_ppm(
+                bench, code, input_state=istate,
+                se_rounds_per_layer=se_rounds_per_layer, code_kwargs=code_kwargs,
+            )
+        else:
+            comp = compile_logical_circuit(
+                bench, code, magic_source=magic,
+                factory_code=(factory_code if cross else None),
+                input_state=istate, se_rounds_per_layer=se_rounds_per_layer,
+                code_kwargs=code_kwargs,
+            )
         n_logical = n
         protocol_label = "processor"
         if check:
@@ -237,6 +265,7 @@ def run_pipeline(
         code=code,
         protocol=protocol_label,
         magic=magic_name,
+        frontend=(frontend if protocol_label == "processor" else "gate"),
         noiseless_error_floor=ref.error_floor,
         noiseless_yield=ref.noiseless_yield,
         unitary_check_detail=detail,

@@ -76,7 +76,8 @@ class Driver:
     """One compilation's worth of state for a :class:`CodeSpec`."""
 
     def __init__(self, spec: CodeSpec, n_patches: int, *, magic: int = 0,
-                 factory_spec: Optional[CodeSpec] = None, **code_kwargs):
+                 factory_spec: Optional[CodeSpec] = None, ppm_ancillas: int = 0,
+                 **code_kwargs):
         self.spec = spec
         self.factory_spec = factory_spec or spec
         self.code_kwargs = code_kwargs
@@ -89,6 +90,9 @@ class Driver:
             [f"inj{i}" for i in range(magic)]
             if self.factory_spec is not spec else []
         )
+        #: logical ancilla patches (data-code) for the PPM front-end's
+        #: transversal Pauli-product-measurement primitive (:mod:`ftsim.ppm`)
+        self.ancilla_names = [f"a{i}" for i in range(ppm_ancillas)]
         self._pmap: Dict[str, object] = {}
         self._spec_of: Dict[str, CodeSpec] = {}
 
@@ -106,6 +110,8 @@ class Driver:
             _add(name, self.factory_spec, slot, 40)
         for slot, name in enumerate(self.inject_names):
             _add(name, spec, slot, 80)
+        for slot, name in enumerate(self.ancilla_names):
+            _add(name, spec, slot, 120)
 
     # -- geometry -----------------------------------------------------
 

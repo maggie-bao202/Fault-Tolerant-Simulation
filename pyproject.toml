@@ -16,6 +16,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "nbconvert>=7", "ipykernel>=6", "matplotlib>=3.8", "nbformat>=5"]
+# PPM / Pauli-based-computation frontend (run_pipeline(..., frontend="ppm")).
+# Only ftsim.ppm.catalyst_frontend imports these, and lazily.
+ppm = ["pennylane>=0.45", "pennylane-catalyst>=0.15"]
 
 [tool.uv.sources]
 lightstim = { path = "../LightStim", editable = true }

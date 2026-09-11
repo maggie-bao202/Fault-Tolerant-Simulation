@@ -73,6 +73,9 @@ ftsim/
                      H6Distillation(level=) / Cultivation + make_magic_source
   score.py           sample -> post-select -> logical-error rate
   sim/ideal.py       dense state-vector reference for check_unitary
+  ppm/               opt-in Pauli-based-computation frontend (frontend="ppm")
+                     LogicalCircuit -> Catalyst PPM passes -> PBC IR ->
+                     encoded stim (Clifford PPMs only; pi/8 -> magic stub)
 tests/
 notebooks/ft_pipeline_demo.ipynb
 ```
@@ -80,9 +83,24 @@ notebooks/ft_pipeline_demo.ipynb
 Add a code: one `ftsim.backends.register(CodeSpec(...))`. Add a factory protocol:
 subclass `ftsim.factory.MagicProtocol` and wire it into `make_magic_source`.
 
+## PPM frontend (opt-in)
+
+`run_pipeline(lc, p, frontend="ppm")` routes the **processor** protocol through a
+Pauli-based-computation layer: the logical circuit is lowered by
+PennyLane/Catalyst (`to_ppr -> commute_ppr -> merge_ppr_ppm`) to a sequence of
+Pauli Product Rotations (`pi/4`/`pi/2` Clifford, `pi/8` non-Clifford) plus
+terminal `Z` measurements, and **only the Clifford part** is compiled to an
+encoded `stim.Circuit` -- each Clifford PPR re-synthesised from transversal
+`{H, S, CNOT}` on `code="h6"` or `"steane"`. Every non-Clifford `pi/8` rotation
+raises in `ftsim.ppm.magic.magic_injection` (the seam where magic-state creation
++ injection will land). The default `frontend="gate"` path is unchanged.
+
+Needs the optional dependency group: `pip install -e ".[ppm]"`.
+
 ## Requirements
 
 Python 3.12; `lightstim` (editable, `../LightStim`), `stim`, `numpy`, `pandas`.
+Optional: `ftsim[ppm]` = `pennylane` + `pennylane-catalyst` for `frontend="ppm"`.
 
 ```
 uv pip install -e ../LightStim -e .      # or: uv sync
